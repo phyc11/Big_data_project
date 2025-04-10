@@ -2,7 +2,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_json, struct
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
-# Khởi tạo Spark Session với thêm thư viện Elasticsearch connector
 spark = SparkSession.builder \
     .appName("KafkaToElasticsearch") \
     .config("spark.jars.packages", 
@@ -35,7 +34,7 @@ data_schema = StructType([
     StructField("condition", StringType(), True)
 ])
 
-# Parse JSON từ Kafka
+# Lấy JSON từ Kafka
 df_selected = df.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), data_schema).alias("data")) \
     .select("data.*")
@@ -68,12 +67,10 @@ query = df_selected.writeStream \
 
 query.awaitTermination()
 
-# Để theo dõi tiến trình, bạn có thể thêm một console output
-console_query = df_selected.writeStream \
-    .outputMode("append") \
-    .format("console") \
-    .option("truncate", "false") \
-    .start()
+# console_query = df_selected.writeStream \
+#     .outputMode("append") \
+#     .format("console") \
+#     .option("truncate", "false") \
+#     .start()
 
-# query.awaitTermination()
-console_query.awaitTermination()
+# console_query.awaitTermination()
