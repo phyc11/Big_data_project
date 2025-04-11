@@ -1,0 +1,2 @@
+location,country,time,temp_c,wind_kph,humidity,pressure_mb,precip_mm,cloud,visibility,uv,condition
+Hanoi,Vietnam,2025-04-10 22:12,24.2,21.6,89.0,1007.0,0.0,100.0,6.0,0.0,Overcast

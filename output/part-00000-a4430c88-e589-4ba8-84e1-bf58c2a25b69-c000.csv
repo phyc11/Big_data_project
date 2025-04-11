@@ -1,0 +1,2 @@
+location,country,time,temp_c,wind_kph,humidity,pressure_mb,precip_mm,cloud,visibility,uv,condition
+Hanoi,Vietnam,2025-04-10 20:07,24.1,19.8,89.0,1006.0,0.0,75.0,6.0,0.0,Partly cloudy

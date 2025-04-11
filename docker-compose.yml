@@ -165,31 +165,99 @@ services:
       - confluent
 
   spark-master:
-    image: bitnami/spark:latest
+    image: bitnami/spark:3.5.0
     command: bin/spark-class org.apache.spark.deploy.master.Master
     ports:
       - "9090:8080"
       - "7077:7077"
+    environment:
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+      SPARK_MODE: master
+    volumes:
+      - ./conf/hadoop:/opt/bitnami/spark/conf/hadoop
     networks:
       - confluent
 
 
   spark-worker:
-    image: bitnami/spark:latest
+    image: bitnami/spark:3.5.0
     command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
       - spark-master
     volumes:
       - ./output:/opt/bitnami/spark/output
+      - ./conf/hadoop:/opt/bitnami/spark/conf/hadoop
     environment:
       SPARK_MODE: worker
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 2g
       SPARK_MASTER_URL: spark://spark-master:7077
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+    networks:
+      - confluent
+    
+  hadoop-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
+    ports:
+      - "9870:9870"  
+      - "9000:9000"  
+    volumes:
+      - hdfs_namenode:/hadoop/dfs/name
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - confluent
     
 
+  hadoop-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_permissions_enabled=false
+    depends_on:
+      hadoop-namenode:
+        condition: service_healthy
+    volumes:
+      - hdfs_datanode:/hadoop/dfs/data
+    networks:
+      - confluent
+
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=jupyter
+      - PYSPARK_DRIVER_PYTHON_OPTS='notebook --no-browser --ip=0.0.0.0 --allow-root --NotebookApp.token='
+      # - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+      - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
+    depends_on:
+      - spark-master
+    networks:
+      - confluent
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./conf/hadoop:/opt/hadoop/etc/hadoop
+ 
   # elasticsearch:
   #   image: docker.elastic.co/elasticsearch/elasticsearch:8.17.4
   #   container_name: elasticsearch
@@ -246,3 +314,5 @@ networks:
 
 volumes:
   elasticsearch_data:
+  hdfs_namenode:
+  hdfs_datanode:
