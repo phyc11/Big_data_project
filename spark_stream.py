@@ -5,8 +5,11 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 spark = SparkSession.builder \
     .appName("WeatherForscast") \
     .config("spark.jars.packages", 
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-common:3.3.6,org.apache.hadoop:hadoop-hdfs:3.3.6") \
+            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,org.apache.hadoop:hadoop-common:3.3.6,org.apache.hadoop:hadoop-hdfs:3.3.6,org.elasticsearch:elasticsearch-spark-30_2.12:7.17.4") \
     .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
+    .config("spark.es.nodes", "elasticsearch") \
+    .config("spark.es.port", "9200") \
+    .config("spark.es.nodes.wan.only", "true") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("ERROR")
@@ -50,25 +53,17 @@ query = df_selected.writeStream \
     .outputMode("append") \
     .start()
 
+
+# Ghi vào Elasticsearch
+query_es = df_selected.writeStream \
+    .outputMode("append") \
+    .format("es") \
+    .option("checkpointLocation", "/tmp/checkpoint") \
+    .option("es.resource", "weather_forecast/_doc") \
+    .start()
+
 query.awaitTermination()
-
-# Thêm một trường id cho Elasticsearch (tùy chọn, nhưng hữu ích)
-# df_with_id = df_selected.withColumn("id", 
-#                                     col("location") + "_" + col("time").cast("string"))
-
-# # Chuyển thành JSON format cho Elasticsearch
-# df_es = df_with_id.select(to_json(struct("*")).alias("value"))
-
-# # Ghi vào Elasticsearch
-# query = df_es.writeStream \
-#     .outputMode("append") \
-#     .format("es") \
-#     .option("checkpointLocation", "/tmp/checkpoint") \
-#     .option("es.nodes", "elasticsearch") \
-#     .option("es.port", "9200") \
-#     .option("es.resource", "weather_forecast") \
-#     .option("es.nodes.wan.only", "true") \
-#     .start()
+query_es.awaitTermination()
 
 # query = df_selected.writeStream \
 #     .format("csv") \
