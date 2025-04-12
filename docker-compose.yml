@@ -239,7 +239,7 @@ services:
       - confluent
 
   jupyter:
-    image: jupyter/pyspark-notebook:spark-3.5.0
+    image: jupyter/pyspark-notebook
     container_name: jupyter
     ports:
       - "8888:8888"
