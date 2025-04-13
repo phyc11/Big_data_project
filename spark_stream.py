@@ -58,7 +58,7 @@ query = df_selected.writeStream \
 query_es = df_selected.writeStream \
     .outputMode("append") \
     .format("es") \
-    .option("checkpointLocation", "/tmp/checkpoint") \
+    .option("checkpointLocation", "hdfs://namenode:9000/tmp/checkpointes") \
     .option("es.resource", "weather_forecast/_doc") \
     .start()
 
