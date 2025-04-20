@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, to_json, struct
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType
-
+from pyspark.sql.functions import from_json, col, to_json, struct,explode
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType,ArrayType
+from pyspark.sql.functions import to_timestamp, expr,to_date
 spark = SparkSession.builder \
     .appName("WeatherForscast") \
     .config("spark.jars.packages", 
@@ -14,7 +14,7 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("ERROR")
 
-# Đọc dữ liệu từ Kafka
+
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "broker:29092") \
@@ -26,44 +26,54 @@ df = spark.readStream \
 # Định nghĩa schema
 data_schema = StructType([
     StructField("location", StringType(), True),
-    StructField("country", StringType(), True),
-    StructField("time", StringType(), True),
-    StructField("temp_c", DoubleType(), True),
-    StructField("wind_kph", DoubleType(), True),
-    StructField("humidity", DoubleType(), True),
-    StructField("pressure_mb", DoubleType(), True),
-    StructField("precip_mm", DoubleType(), True),
+    StructField("date", StringType(), True),
+    StructField("Time", StringType(), True),
+    StructField("conditions", StringType(), True),
+    StructField("temp", DoubleType(), True),
+    StructField("rain", DoubleType(), True),
     StructField("cloud", DoubleType(), True),
-    StructField("visibility", DoubleType(), True),
-    StructField("uv", DoubleType(), True),
-    StructField("condition", StringType(), True)
+    StructField("pressure", DoubleType(), True),
+    StructField("humidity", DoubleType(), True),
+    StructField("windspeed", DoubleType(), True),
+    StructField("Gust", DoubleType(), True),
+    StructField("actual_hour",StringType(),True)
+
 ])
 
 # Lấy JSON từ Kafka
 df_selected = df.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), data_schema).alias("data")) \
-    .select("data.*")
-
-
+    .select(from_json(col("value"), ArrayType(data_schema)).alias("data")) \
+    .select(explode(col("data")).alias("weather")) \
+    .select("weather.*")
 query = df_selected.writeStream \
     .format("csv") \
     .option("path", "hdfs://namenode:9000/tmp/weather_data") \
     .option("checkpointLocation", "hdfs://namenode:9000/tmp/checkpoints") \
     .option("header", "true") \
+    .partitionBy("location") \
     .outputMode("append") \
     .start()
-
+query.awaitTermination()
 
 # Ghi vào Elasticsearch
-query_es = df_selected.writeStream \
-    .outputMode("append") \
-    .format("es") \
-    .option("checkpointLocation", "hdfs://namenode:9000/tmp/checkpointes") \
-    .option("es.resource", "weather_forecast/_doc") \
-    .start()
 
-query.awaitTermination()
-query_es.awaitTermination()
+# query_es = df_selected.writeStream \
+#     .outputMode("append") \
+#     .format("es") \
+#     .option("checkpointLocation", "hdfs://namenode:9000/tmp/checkpointes") \
+#     .option("es.resource", "weather_forecast/_doc") \
+#     .start()
+=======
+# query_es = df_selected.writeStream \
+#     .outputMode("append") \
+#     .format("es") \
+#     .option("checkpointLocation", "/tmp/checkpoint") \
+#     .option("es.resource", "weather_forecast/_doc") \
+#     .start()
+
+
+
+# query_es.awaitTermination()
 
 # query = df_selected.writeStream \
 #     .format("csv") \
