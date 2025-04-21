@@ -45,6 +45,7 @@ df_selected = df.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), ArrayType(data_schema)).alias("data")) \
     .select(explode(col("data")).alias("weather")) \
     .select("weather.*")
+
 query = df_selected.writeStream \
     .format("csv") \
     .option("path", "hdfs://namenode:9000/tmp/weather_data") \
@@ -63,7 +64,7 @@ query.awaitTermination()
 #     .option("checkpointLocation", "hdfs://namenode:9000/tmp/checkpointes") \
 #     .option("es.resource", "weather_forecast/_doc") \
 #     .start()
-=======
+
 # query_es = df_selected.writeStream \
 #     .outputMode("append") \
 #     .format("es") \

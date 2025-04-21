@@ -220,9 +220,10 @@ services:
       - confluent
     
 
-  hadoop-datanode:
+  hadoop-datanode-1:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: datanode
+    container_name: datanode-1
+    hostname: datanode-1
     environment:
       - CLUSTER_NAME=test
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
@@ -234,9 +235,28 @@ services:
       hadoop-namenode:
         condition: service_healthy
     volumes:
-      - hdfs_datanode:/hadoop/dfs/data
+      - hdfs_datanode-1:/hadoop/dfs/data
     networks:
       - confluent
+  hadoop-datanode-2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode-2
+    hostname: datanode-2
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_permissions_enabled=false
+    depends_on:
+      hadoop-namenode:
+        condition: service_healthy
+    volumes:
+      - hdfs_datanode-2:/hadoop/dfs/data
+    networks:
+      - confluent
+
 
   jupyter:
     image: jupyter/pyspark-notebook:spark-3.4.0
@@ -309,4 +329,5 @@ networks:
 volumes:
   elasticsearch_data:
   hdfs_namenode:
-  hdfs_datanode:
+  hdfs_datanode-1:
+  hdfs_datanode-2:

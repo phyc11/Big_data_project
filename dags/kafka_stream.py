@@ -90,7 +90,7 @@ def get_data(location):
     API_KEY = "WXMXL5WQ42ZSHMM8ZN2AHZ5Q9"  
     LOCATION = f"{location},VN"
     
-    # Lấy 8 mốc thời gian tính từ hiện tại trở về trước
+    
     timestamps = get_timestamps_now(4)
     vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
     now = datetime.datetime.now(vietnam_tz)
