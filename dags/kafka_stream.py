@@ -75,7 +75,7 @@ def find_closest_hour_data(data, target_datetime):
         "location":data.get("address"),
         "date": f"{target_date}",
         "Time":target_datetime.strftime('%H:%M'),
-        "conditions": closest_hour_data.get("conditions"),
+        "Weather": closest_hour_data.get("conditions"),
         "temp": closest_hour_data.get("temp"),
         "rain": closest_hour_data.get("precip"),
         "cloud":closest_hour_data.get("cloudcover"),
@@ -88,6 +88,10 @@ def find_closest_hour_data(data, target_datetime):
     }
 def get_data(location):
     API_KEY = "WXMXL5WQ42ZSHMM8ZN2AHZ5Q9"  
+    API_KEY_2 = "RMX4JCJ9L8PK2AJ57TT4E8CDB"  
+    API_KEY_3 ="VUD89TDP3HWWFDGPD9XYQRY57"
+    API_KEY_4="53NLGN6GC7M28L4C8BXPDQDHA"
+    
     LOCATION = f"{location},VN"
     
     
@@ -100,7 +104,7 @@ def get_data(location):
     if start_date == end_date:
         end_date = (timestamps[-1] + datetime.timedelta(days=1)).strftime('%Y-%m-%d') 
     # Lấy dữ liệu từ API
-    data = get_weather_data(API_KEY, LOCATION, start_date, end_date)
+    data = get_weather_data(API_KEY_3, LOCATION, start_date, end_date)
     result = []
     for ts in timestamps:
         hour_data = find_closest_hour_data(data, ts)
