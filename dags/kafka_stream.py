@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import logging
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.utils.dates import days_ago
 import requests
 import json
@@ -49,8 +50,9 @@ def get_timestamps_now(count=8):
     now = datetime.datetime.now(vietnam_tz)
     timestamps = [now - datetime.timedelta(hours=3 * i) for i in range(count)]
     return timestamps[::-1]
-def find_closest_hour_data(data, target_datetime):
-    
+
+
+def find_closest_hour_data(data, target_datetime):    
     target_date = target_datetime.strftime('%Y-%m-%d')
     target_hour = target_datetime.hour
     day_data = None
@@ -80,12 +82,11 @@ def find_closest_hour_data(data, target_datetime):
         "rain": closest_hour_data.get("precip"),
         "cloud":closest_hour_data.get("cloudcover"),
         "pressure":closest_hour_data.get("pressure"),
-        "humidity": closest_hour_data.get("humidity"),
         "windspeed": closest_hour_data.get("windspeed"),
         "Gust":closest_hour_data.get("windgust"), 
         "actual_hour": closest_hour_data.get("datetime") ,
-        
     }
+
 def get_data(location):
     API_KEY = "WXMXL5WQ42ZSHMM8ZN2AHZ5Q9"  
     API_KEY_2 = "RMX4JCJ9L8PK2AJ57TT4E8CDB"  
@@ -94,8 +95,8 @@ def get_data(location):
     
     LOCATION = f"{location},VN"
     
-    
-    timestamps = get_timestamps_now(4)
+    # Lấy 8 mốc thời gian tính từ hiện tại trở về trước
+    timestamps = get_timestamps_now()
     vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
     now = datetime.datetime.now(vietnam_tz)
     
@@ -104,7 +105,7 @@ def get_data(location):
     if start_date == end_date:
         end_date = (timestamps[-1] + datetime.timedelta(days=1)).strftime('%Y-%m-%d') 
     # Lấy dữ liệu từ API
-    data = get_weather_data(API_KEY_3, LOCATION, start_date, end_date)
+    data = get_weather_data(API_KEY, LOCATION, start_date, end_date)
     result = []
     for ts in timestamps:
         hour_data = find_closest_hour_data(data, ts)
@@ -122,8 +123,7 @@ def streaming_data():
 
         res = get_data(location)
         
-        producer.send('weather_forecast', json.dumps(res).encode('utf-8'))
-
+        producer.send('weather_forecast_new', json.dumps(res).encode('utf-8'))
 
         #print(json.dumps(data, indent=3))
         time.sleep(2) 
@@ -133,16 +133,33 @@ def streaming_data():
 dag = DAG(
     'weather_collected',
     default_args=default_args,
-    schedule_interval=timedelta(minutes=10),
+    schedule_interval="21 0 * * * *",  
     catchup=False,
 )
 
-streaming_task = PythonOperator(
-    task_id='streaming_weather_data',
+extract_data_task = PythonOperator(
+    task_id='extracting_weather_data',
     python_callable=streaming_data,
     dag=dag,
 )
 
-streaming_task
-# streaming_data()
+load_data_task = SparkSubmitOperator(
+    task_id='loading_weather_data',
+    application='/opt/airflow/dags/spark_submit.py',
+    conn_id='my_spark_config',
+    packages='org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,org.apache.hadoop:hadoop-common:3.3.6,org.apache.hadoop:hadoop-hdfs:3.3.6,org.elasticsearch:elasticsearch-spark-30_2.12:7.17.4',
+    verbose=True,
+    dag=dag
+)
+
+predict_data_task = SparkSubmitOperator(
+    task_id='predict_weather_data',
+    application='/opt/airflow/dags/spark_predict_weather.py',
+    conn_id='my_spark_config',
+    packages='org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,org.apache.hadoop:hadoop-common:3.3.6,org.apache.hadoop:hadoop-hdfs:3.3.6,org.elasticsearch:elasticsearch-spark-30_2.12:7.17.4',
+    verbose=True,
+    dag=dag
+)
+extract_data_task >> load_data_task >> predict_data_task
+
 

@@ -105,6 +105,9 @@ services:
       retries: 5
 
   webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: apache/airflow:2.6.0-python3.9
     command: webserver
     entrypoint: ['/opt/airflow/script/entrypoint.sh']
@@ -114,7 +117,7 @@ services:
       - LOAD_EX=n
       - EXECUTOR=Sequential
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
+      - AIRFLOW__WEBSERVER__SECRET_KEY=this_is_a_very_secured_key
     logging:
       options:
         max-size: 10m
@@ -123,17 +126,22 @@ services:
       - ./dags:/opt/airflow/dags
       - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
       - ./requirements.txt:/opt/airflow/requirements.txt
+      - ./logs:/opt/airflow/logs
     ports:
       - "8080:8080"
     healthcheck:
       test: ['CMD-SHELL', "[ -f /opt/airflow/airflow-webserver.pid ]"]
       interval: 30s
-      timeout: 30s
-      retries: 3
+      timeout: 60s
+      start_period: 180s
+      retries: 10
     networks:
       - confluent
 
   scheduler:
+    build: 
+      context: .
+      dockerfile: Dockerfile
     image: apache/airflow:2.6.0-python3.9
     depends_on:
       webserver:
@@ -142,11 +150,12 @@ services:
       - ./dags:/opt/airflow/dags
       - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
       - ./requirements.txt:/opt/airflow/requirements.txt
+      - ./logs:/opt/airflow/logs
     environment:
       - LOAD_EX=n
       - EXECUTOR=Sequential
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
+      - AIRFLOW__WEBSERVER__SECRET_KEY=this_is_a_very_secured_key
     command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
     networks:
       - confluent
@@ -220,10 +229,9 @@ services:
       - confluent
     
 
-  hadoop-datanode-1:
+  hadoop-datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: datanode-1
-    hostname: datanode-1
+    container_name: datanode
     environment:
       - CLUSTER_NAME=test
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
@@ -235,28 +243,9 @@ services:
       hadoop-namenode:
         condition: service_healthy
     volumes:
-      - hdfs_datanode-1:/hadoop/dfs/data
+      - hdfs_datanode:/hadoop/dfs/data
     networks:
       - confluent
-  hadoop-datanode-2:
-    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: datanode-2
-    hostname: datanode-2
-    environment:
-      - CLUSTER_NAME=test
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-      - CORE_CONF_hadoop_http_staticuser_user=root
-      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
-      - HDFS_CONF_dfs_webhdfs_enabled=true
-      - HDFS_CONF_dfs_permissions_enabled=false
-    depends_on:
-      hadoop-namenode:
-        condition: service_healthy
-    volumes:
-      - hdfs_datanode-2:/hadoop/dfs/data
-    networks:
-      - confluent
-
 
   jupyter:
     image: jupyter/pyspark-notebook:spark-3.4.0
@@ -329,5 +318,4 @@ networks:
 volumes:
   elasticsearch_data:
   hdfs_namenode:
-  hdfs_datanode-1:
-  hdfs_datanode-2:
+  hdfs_datanode:
